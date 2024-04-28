@@ -29,12 +29,42 @@ function val(token) {
   }
 }
 
+app.post("/login", async function (req, res) {
+  let connection = await getDBConnnection();
+  let sql = "SELECT * FROM first_users WHERE username = ?";
+  try {
+    let [results] = await connection.execute(sql, [req.body.username]);
+    bcrypt.compare(req.body.password, results[0].password, (err, result) => {
+      if (result) {
+        let token = jwt.sign(
+          {
+            sub: results[0].id,
+            name: results[0].name,
+          },
+          "halloj",
+          { expiresIn: "2h" }
+        );
+        res.json(token);
+      } else {
+        res.json(401);
+      }
+    });
+  } catch (error) {
+    res.json(401);
+  }
+});
+
 app.get("/", (req, res) => {
   res.send(`<h1>Doumentation EXEMPEL</h1>
   <ul><li> GET /users</li></ul>`);
 });
 
 app.get("/get", async function (req, res) {
+  let auth = req.headers["authorization"];
+  if (auth === undefined) {
+    res.status.send(401).send("auth token missing");
+  }
+  let token = auth.slice(7);
   val(token);
   let connection = await getDBConnnection();
   let sql = `SELECT * From first_users`;
@@ -45,6 +75,11 @@ app.get("/get", async function (req, res) {
 });
 
 app.post("/user", async function (req, res) {
+  let auth = req.headers["authorization"];
+  if (auth === undefined) {
+    res.status.send(401).send("auth token missing");
+  }
+  let token = auth.slice(7);
   val(token);
   try {
     let connection = await getDBConnnection();
@@ -57,7 +92,12 @@ app.post("/user", async function (req, res) {
   }
 });
 
-app.put("/users/id", async function (req, res) {
+app.put("/users/:id", async function (req, res) {
+  let auth = req.headers["authorization"];
+  if (auth === undefined) {
+    res.status.send(401).send("auth token missing");
+  }
+  let token = auth.slice(7);
   val(token);
   let connection = await getDBConnnection();
   //kod här för att hantera anrop…
@@ -65,12 +105,12 @@ app.put("/users/id", async function (req, res) {
   try {
     let sql = `UPDATE first_users
     SET name = ?, email = ?
-    WHERE username = ?`;
+    WHERE id = ?`;
 
     let [results] = await connection.execute(sql, [
       req.body.name,
       req.body.email,
-      req.body.username,
+      req.params.id,
     ]);
     res.json("200 OK");
   } catch (error) {
@@ -106,30 +146,6 @@ app.post("/users", async function (req, res) {
   res.json(results);
 });
 
-app.post("/login", async function (req, res) {
-  let connection = await getDBConnnection();
-  let sql = "SELECT * FROM first_users WHERE username = ?";
-  try {
-    let [results] = await connection.execute(sql, [req.body.username]);
-    bcrypt.compare(req.body.password, results[0].password, (err, result) => {
-      if (result) {
-        let token = jwt.sign(
-          {
-            sub: results[0].id,
-            name: results[0].name,
-          },
-          "halloj",
-          { expiresIn: "2h" }
-        );
-        res.json(token);
-      } else {
-        res.json(401);
-      }
-    });
-  } catch (error) {
-    res.json(401);
-  }
-});
 // console.log(results[0].password);
 
 const port = 3000;
